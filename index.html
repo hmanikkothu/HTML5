@@ -1,78 +1,281 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<html lang="en-AU">
+
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+	<title>Bubbles - game using html5</title>
 
-	<title>hmanikkothu/HTML5 @ GitHub</title>
-	
-	<style type="text/css">
-		body {
-  		margin-top: 1.0em;
-  		background-color: #b9af09;
-		  font-family: "Helvetica,Arial,FreeSans";
-  		color: #ffffff;
-    }
-    #container {
-      margin: 0 auto;
-      width: 700px;
-    }
-		h1 { font-size: 3.8em; color: #4650f6; margin-bottom: 3px; }
-		h1 .small { font-size: 0.4em; }
-		h1 a { text-decoration: none }
-		h2 { font-size: 1.5em; color: #4650f6; }
-    h3 { text-align: center; color: #4650f6; }
-    a { color: #4650f6; }
-    .description { font-size: 1.2em; margin-bottom: 30px; margin-top: 30px; font-style: italic;}
-    .download { float: right; }
-		pre { background: #000; color: #fff; padding: 15px;}
-    hr { border: 0; width: 80%; border-bottom: 1px solid #aaa}
-    .footer { text-align:center; padding-top:30px; font-style: italic; }
+	<script type="text/javascript">
+		var x = 10;
+		var cX = 250, cY = 399;
+		var blts = [], blls = [], blts_obs_indx = [], blls_obs_indx = [], blls_cldd = [], blts_cldd = [];
+		var rad = 180/Math.PI;
+		var blt_spd = 5, bll_spd=5;
+		var bll_drp_intr = 1750;
+		var cnn_smth_angl = 6;
+		var score = 0;
+		window.onload = function()
+		{
+			var canvas = document.getElementById('game');
+			var ctx = canvas.getContext('2d');
+			draw();
+			function draw()
+			{
+				//ctx.clearRect();
+				// background
+				var lingrad = ctx.createLinearGradient(0,0,0,canvas.height);
+				lingrad.addColorStop(0, 'rgba(13,153,255,1)');
+				lingrad.addColorStop(0.1, 'rgba(70,177,255,.6)');
+				lingrad.addColorStop(0.3, 'rgba(102,190,255,.6)');
+				lingrad.addColorStop(1, 'rgba(211,236,236, .6)');
+				ctx.fillStyle=lingrad;
+				ctx.fillRect(0,0,canvas.width, canvas.height);
+
+				ctx.beginPath();
+				var stX = cX + (30*Math.cos((x+10)/rad));
+				var stY = cY - (30*Math.sin((x+10)/rad));
+				var endX = cX + (30*Math.cos((x-10)/rad));
+				var endY = cY - (30*Math.sin((x-10)/rad));
+
+				var lingrad2 = ctx.createLinearGradient(stX,stY,endX,endY);
+				lingrad2.addColorStop(0, '#933300');
+				lingrad2.addColorStop(0.3, '#EC3300');
+				lingrad2.addColorStop(1, '#933300');
+				ctx.fillStyle=lingrad2;
+				ctx.moveTo(stX, stY);
+				ctx.lineTo(cX + (55*Math.cos((x+4)/rad)), cY - (55*Math.sin((x+4)/rad)));
+				ctx.lineTo(cX + (55*Math.cos((x-4)/rad)), cY - (55*Math.sin((x-4)/rad)));
+				ctx.lineTo(endX, endY);
+				ctx.fill();
+				//ctx.stroke();
+
+				ctx.beginPath();
+				var radgrad = ctx.createRadialGradient(cX-5, cY-5, 2,cX, cY, 30);
+				radgrad.addColorStop(.1, '#FFA987');
+				radgrad.addColorStop(1, '#FF743A');
+				ctx.fillStyle = radgrad;
+				ctx.arc(cX, cY, 30, 0, Math.PI, true);
+				ctx.fill();
+
+				//draw bullets
+				for (var i = 0; i < blts.length; i++) {
+					ctx.beginPath();
+					ctx.fillStyle = 'rgba(255,0,0,1)';
+					//ctx.moveTo(blts[i].c.x, blts[i].c.y);
+					ctx.arc(blts[i].c.x, blts[i].c.y, blts[i].r, 0, Math.PI*2, true);
+					ctx.fill();
+				}
+
+				//draw bubbles
+				for (var i = 0; i < blls.length; i++) {
+					ctx.beginPath();
+					if(blls[i].collided) {
+						ctx.fillStyle = '#01C962';
+					}
+					else
+					{
+						var radgrad = ctx.createRadialGradient(blls[i].c.x-blls[i].r+6, blls[i].c.y-4, 1,blls[i].c.x, blls[i].c.y,blls[i].r);
+						radgrad.addColorStop(.1, '#A7D30C');
+						radgrad.addColorStop(1, '#019F62');
+						radgrad.addColorStop(1, 'rgba(1,159,98,0)');
+						ctx.fillStyle = radgrad;
+					}
+					ctx.arc(blls[i].c.x, blls[i].c.y, blls[i].r, 0, Math.PI*2, true);
+					ctx.fill();
+				}
+
+				// Remove collided bubbles from the queue
+				for(var i = 0; i < blls_cldd.length; i++) {
+					blls.splice(blls_cldd[i],1);
+				}
+				blls_cldd = [];
+
+				//draw Panel
+				drawPanel();
+
+			}
+
+			setInterval(function(){
+				moveBalls();
+			}, 40);
+			setInterval(function(){
+				draw();
+				moveBullets();
+			}, 8);
+			setInterval(dropBalls, bll_drp_intr);
+
+		};
+
+		window.onkeydown = function(evt)
+		{
+			if(evt.keyCode == 39) {
+				if (x > 10){
+					x-=cnn_smth_angl;
+				}
+			}
+			else if (evt.keyCode == 37) {
+				if (x < 170){
+					x += cnn_smth_angl;
+				}
+			}
+			else if (evt.keyCode == 32 || evt.keyCode == 38)
+			{
+				spawnBullet();
+				return false;
+			}
+		};
+
+		function spawnBullet(){
+			var bx = cX + (61*Math.cos(x/rad));
+			var by = cY - (61*Math.sin(x/rad));
+			//blts[blts.length] = {a:x, c:{x: bx, y: by}, v: Math.floor(Math.random()*blt_spd) + 3, d: 62, r: 3};
+			blts[blts.length] = {a:x, c:{x: bx, y: by}, v: blt_spd, d: 62, r: 3};
+		}
+
+		function dropBalls(){
+			var bx = Math.floor(Math.random()*500);
+			var by = 3;
+			var vl = Math.floor(Math.random()*bll_spd)+3;
+			blls[blls.length] = {c:{x: bx, y: by}, v: vl, r: (vl * 3) + 7};
+		}
+
+		function moveBalls() {
+			for (var i = 0; i < blls.length; i++) {
+				blls[i].c.y += blls[i].v;
+				if(!isInView(blls[i], i)){
+					blls_obs_indx[blls_obs_indx.length] = i;
+				}
+			}
+
+			// clean out of boundary balls
+			for (var i = 0; i < blls_obs_indx.length; i++) {
+				blls.splice(blls_obs_indx[i],1);
+			}
+			blls_obs_indx = [];
+		}
+
+		function moveBullets() {
+			for (var i = 0; i < blts.length; i++) {
+				var ba = blts[i].a;
+				var br = blts[i].d = blts[i].d + blts[i].v;
+				blts[i].c.x = cX + (br*Math.cos(ba/rad));
+				blts[i].c.y = cY - (br*Math.sin(ba/rad));
+				if(!isInView(blts[i])){
+					blts_obs_indx[blts_obs_indx.length] = i;
+				}
+			}
+			// clean out of boundary bullets
+			for (var i = 0; i < blts_obs_indx.length; i++) {
+				blts.splice(blts_obs_indx[i],1);
+			}
+			blts_obs_indx = [];
+			for (var i = 0; i < blts.length; i++) {
+				for (var j = 0; j < blls.length; j++) {
+					if (hasCollided(blts[i], blls[j])) {
+						blls[j].collided = true;
+						blls[j].v = 0;
+						blls[j].r += 8;
+						blts_cldd[blts_cldd.length] = i;
+						blls_cldd[blls_cldd.length] = j;
+						score += 10;
+					}
+				}
+			}
+			for(var i = 0; i < blts_cldd.length; i++) {
+				blts.splice(blts_cldd[i],1);
+			}
+			blts_cldd = [];
+		}
+
+		function isInView(o, i){
+			var x = o.c.x;
+			var y = o.c.y;
+			// bullets going out of view
+			if (x < 0 || x > 500 || y < 0) {
+				score=(score<2?0:score-2);
+				return false;
+			}
+			//This is to bring the bubble breaking effect on lading the ground.
+			else if (y > 390)
+			{
+				score=(score<6?0:score-6);
+				o.collided = true;
+				o.v = 0;
+				o.r += 8;
+				blls_cldd[blls_cldd.length] = i;
+				return true;
+			}
+			else {
+				return true;
+			}
+		}
+
+		function hasCollided(blt, bll) {
+			return (Math.pow(blt.r + bll.r, 2)>=Math.pow(bll.c.x-blt.c.x, 2) + Math.pow(bll.c.y-blt.c.y, 2))?true:false;
+		}
+
+		var paused = false;
+		function drawPanel() {
+			var cv = document.getElementById('gamePanel');
+			var pctx = cv.getContext('2d');
+			pctx.fillStyle='#B9E1F0';
+			pctx.fillRect(0,0,cv.width, cv.height);
+			pctx.fillStyle='#333';
+			pctx.font = "bold 20px sans-serif";
+			pctx.fillText("Your score : " + score, 160, 26);
+		}
+	</script>
+
+	<style>
+		body{text-align: center;color:#fff;background:#111;}
+		#cntnr
+		{
+			text-align: center;
+			width: 100%;
+		}
+
+		#instruction
+		{
+			width: 100%;
+		}
+		#gamePanel
+		{
+			top:15px;
+			position: relative;
+		}
+		#i
+		{
+			font-face: sans-serif;
+			font-weight: bold;
+			width: 200px;
+		}
+
 	</style>
-	
+
 </head>
 
 <body>
-  <a href="http://github.com/hmanikkothu/HTML5"><img style="position: absolute; top: 0; right: 0; border: 0;" src="http://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub" /></a>
 
-  <div id="container">
+<div id="cntnr">
 
-    <div class="download">
-      <a href="http://github.com/hmanikkothu/HTML5/zipball/master">
-        <img border="0" width="90" src="http://github.com/images/modules/download/zip.png"></a>
-      <a href="http://github.com/hmanikkothu/HTML5/tarball/master">
-        <img border="0" width="90" src="http://github.com/images/modules/download/tar.png"></a>
-    </div>
+	<canvas id="game" width="500" height="400" style="border: solid 2px #4EB4FF">
+		This game requires a browser that supports HTML5 Canvas. (Google chrome, FireFox, Safari, IE9 Beta etc support Canvas.)
+	</canvas>
+	<br>
+	<canvas id="gamePanel" width="500" height="35" style="border: solid 2px #88E1F0"></canvas>
+	<br>
+	<div id="instruction">
+		<br>
+		<span id="i"><u>Instructions</u><br>
+				<span>Use "Left" and "Right" arrow keys to rotate the gun.</span><br>
+				<span>Use "Space bar" or "Up" arrow key to shoot.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><br>
+				<span>You get 10 points when your shot hit target bubble.</span><br>
+				<span>You loose 6 points if a bubble drops on the ground.</span><br>
+				<span>You loose 2 points if you waste a bullet with out hitting target.</span><br>
+		</span>
 
-    <h1><a href="http://github.com/hmanikkothu/HTML5">HTML5</a>
-      <span class="small">by <a href="http://github.com/hmanikkothu">hmanikkothu</a></span></h1>
+	</div>
+</div>
 
-    <div class="description">
-      This project objective is to show case some of the HTML5 features that I am trying out.
-    </div>
-
-    <h2>Contact</h2>
-<p> (hari.kandakkai@gmail.com)<br/>      </p>
-
-
-    <h2>Download</h2>
-    <p>
-      You can download this project in either
-      <a href="http://github.com/hmanikkothu/HTML5/zipball/master">zip</a> or
-      <a href="http://github.com/hmanikkothu/HTML5/tarball/master">tar</a> formats.
-    </p>
-    <p>You can also clone the project with <a href="http://git-scm.com">Git</a>
-      by running:
-      <pre>$ git clone git://github.com/hmanikkothu/HTML5</pre>
-    </p>
-
-    <div class="footer">
-      get the source code on GitHub : <a href="http://github.com/hmanikkothu/HTML5">hmanikkothu/HTML5</a>
-    </div>
-
-  </div>
-
-  
 </body>
 </html>
